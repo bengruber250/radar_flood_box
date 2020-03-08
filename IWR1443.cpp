@@ -1,7 +1,8 @@
 #include "IWR1443.h"
 #include "detected_obj.h"
 #include "Arduino.h"
-#define BAUD_RX 921600
+// Prev 916200`
+#define BAUD_RX 57600
 #define BAUD_TX 115200
 constexpr char magicWord[8] = {0x02, 0x01, 0x04, 0x03, 0x06, 0x05, 0x08, 0x07};
 const char* setupCommands[] = {
@@ -16,7 +17,7 @@ const char* setupCommands[] = {
     "frameCfg 0 0 1 0 500 1 0",
     "calibDcRangeSig 0 -5 5 32",
     "guiMonitor 1   1 0  0 0  1",
-    "RangeLimitCfg 1 1.0 5.0",
+    "RangeLimitCfg 1 0.5 5.0",
     "sensorStart",
 };
 
@@ -45,7 +46,8 @@ void IWR1443::loadHeader() {
     //Endianness ??
 }
 
-IWR1443::IWR1443() {}
+IWR1443::IWR1443(SoftwareSerial &debug) :debug(debug) {}
+
 void IWR1443::setupComms() {
   Serial.begin(BAUD_TX);
   delay(10);
@@ -59,7 +61,7 @@ void IWR1443::setupComms() {
   Serial.begin(BAUD_RX);
 }
 
-double IWR1443::processTLVs()
+uint32_t IWR1443::processTLVs()
 {
     for (int tlv_num = 0; tlv_num < header.numTLVs; tlv_num++) {
         MmwDemo_output_message_tl tag_length;
@@ -70,7 +72,11 @@ double IWR1443::processTLVs()
             int next_byte = Serial.read();
             *(ptr++) = next_byte;
         }
-        printf("Tag %d, Length %d\n", tag_length.type, tag_length.length);
+        //printf("Tag %d, Length %d\n", tag_length.type, tag_length.length);
+//        debug.print("Tag, length: ");
+//        debug.print(tag_length.type);
+//        debug.print(" ");
+//        debug.print(tag_length.length);
         if (tag_length.type == MMWDEMO_OUTPUT_MSG_DETECTED_POINTS) { // Obj detected.
             /* Get Metadata */
             MmwDemo_output_message_dataObjDescr obj_metadata;
@@ -91,10 +97,11 @@ double IWR1443::processTLVs()
                     int next_byte = Serial.read();
                     *(ptr++) = next_byte;
                 }
-                //TODO(Ben) Figure out Q format.
-                int attempt = detected_obj.rangeIdx + detected_obj.x * 65536;
+                uint32_t attempt = (uint32_t)detected_obj.rangeIdx + (((uint32_t)detected_obj.x) * 65536);
                 double real_range_meters = attempt / 1048576.0;
                 double adjusted_range = (real_range_meters - 0.0696) * 1000;
+                debug.print("Range: ");
+                debug.println(adjusted_range);
                 return adjusted_range;
             }
 
@@ -108,11 +115,15 @@ int IWR1443::getSamples(double array[], int num_samples) {
   for (int i = 0; i < num_samples; ++i) {
     waitForMagicWord();
     loadHeader();
-    double height = processTLVs();
+    auto height = processTLVs();
+    debug.print("Header length: ");
+    debug.println(header.totalPacketLen);
+    debug.println("BS int:");
+    debug.println(height);
     if (height == -1) {
         return i;
     }
-    array[i] = processTLVs();
+    array[i] = height;
   }
   return num_samples;
 }

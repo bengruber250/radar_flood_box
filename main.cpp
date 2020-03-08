@@ -6,7 +6,7 @@
 #include <avr/wdt.h>
 #include "IWR1443.h"
 //EDIT BELOW FOR SENSOR NODE ID
-#define NODE_ID 2
+#define NODE_ID 3
 #define SLEEP_TRIGGER 3
 #define PULL_UP 8
 #define TEMP_PIN A0
@@ -65,19 +65,15 @@ volatile int packet_id = 0;
 #define FONA_RX 11 // Microcontroller TX
 //#define T_ALERT 12 // Connect with solder jumper
 
-// this is a large buffer for replies
-char replybuffer[255];
 
 // We default to using software serial. If you want to use hardware serial
 // (because softserial isnt supported) comment out the following three lines 
 // and uncomment the HardwareSerial line
 #include <SoftwareSerial.h>
 SoftwareSerial fonaSS = SoftwareSerial(FONA_TX, FONA_RX);
-SoftwareSerial debug(2, 12);
+SoftwareSerial debug = SoftwareSerial(2, 12);
 unsigned int tempValue = 0;
 
-
-SoftwareSerial *fonaSerial = &fonaSS; 
   
 // Use this one for LTE CAT-M/NB-IoT modules (like SIM7000)
 // Notice how we don't include the reset pin because it's reserved for emergencies on the LTE module!
@@ -100,7 +96,7 @@ void setup() {
   pinMode(SLEEP_TRIGGER, OUTPUT);
   
   debug.println("init iwr...");
-  IWR1443 iwr = IWR1443();
+  IWR1443 iwr = IWR1443(debug);
   iwr.setupComms();
   debug.println("init iwr...OK");
   
@@ -223,10 +219,10 @@ void setup() {
 
   //printMenu();
 
-  debug.print("Turning GPRS OFF... ");
+  debug.print("Turning GPRS OFF... JK ");
   // turn GPRS off(g)
-  if (!fona.enableGPRS(false))
-    debug.println(F("Failed to turn off"));
+//  if (!fona.enableGPRS(false))
+//    debug.println(F("Failed to turn off"));
   
   debug.println("Done.");
   
@@ -253,7 +249,7 @@ void setup() {
   }
   wdt_setup();
   debug.println("Done.");
-  //from ext
+  //from
   
   pinMode(PULL_UP, OUTPUT);
 
@@ -278,7 +274,11 @@ void setup() {
   itoa(packet_id, packet_id_arr, 10);
   
   for (int j = 0; j < 5; j++) {
-    snprintf(data, 5, "%f", results[5]);
+    char heightVal[6];
+    dtostrf(results[j], 5, 0, heightVal);
+    debug.println(results[j]);
+    //snprintf(data + strlen(data), 5, "%f", results[j]);
+    strcat(data, heightVal);
     strcat(data, ",");
   }
   
@@ -291,7 +291,7 @@ void setup() {
   strcat(data, node_id_arr);
   
   char data_message[150] = {};
-  strcat(data_message, "{\"k\":\"12Xq_8BM\",\"d\":\"");
+  strcat(data_message, "{\"k\":\"SZxBwu9,\",\"d\":\"");
   strcat(data_message, data);
   strcat(data_message, "\",\"t\":[\"sensor");
   strcat(data_message, node_id_arr);
